@@ -9,6 +9,7 @@ import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/widgets/animated_rotation_widget.dart';
 import 'package:flutter_hbb/common/widgets/custom_password.dart';
 import 'package:flutter_hbb/consts.dart';
+import 'package:flutter_hbb/desktop/pages/connection_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
 import 'package:flutter_hbb/desktop/widgets/update_progress.dart';
@@ -58,10 +59,16 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    // 只显示左侧面板
+    final isIncomingOnly = bind.isIncomingOnly();
     return _buildBlock(
-      child: buildLeftPane(context),
-    );
+        child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        buildLeftPane(context),
+        if (!isIncomingOnly) const VerticalDivider(width: 1),
+        if (!isIncomingOnly) Expanded(child: buildRightPane(context)),
+      ],
+    ));
   }
 
   Widget _buildBlock({required Widget child}) {
@@ -70,8 +77,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget buildLeftPane(BuildContext context) {
+    final isIncomingOnly = bind.isIncomingOnly();
     final isOutgoingOnly = bind.isOutgoingOnly();
     final children = <Widget>[
+      if (!isOutgoingOnly) buildPresetPasswordWarning(),
       if (bind.isCustomClient())
         Align(
           alignment: Alignment.center,
@@ -89,10 +98,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             Obx(() => buildHelpCards(stateGlobal.updateUrl.value))),
         builder: (_, data) {
           if (data.hasData) {
-            // 调整窗口大小
-            Future.delayed(Duration(milliseconds: 300), () {
-              _updateWindowSize();
-            });
+            if (isIncomingOnly) {
+              if (isInHomePage()) {
+                Future.delayed(Duration(milliseconds: 300), () {
+                  _updateWindowSize();
+                });
+              }
+            }
             return data.data!;
           } else {
             return const Offstage();
@@ -100,35 +112,26 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         },
       ),
       buildPluginEntry(),
-      Divider(),
-      OnlineStatusWidget(
-        onSvcStatusChanged: () {
-          Future.delayed(Duration(milliseconds: 300), () {
-            _updateWindowSize();
-          });
-        },
-      ).marginOnly(bottom: 6, right: 6),
-      // 添加退出按钮
-      Align(
-        alignment: Alignment.centerRight,
-        child: OutlinedButton(
-          onPressed: () {
-            SystemNavigator.pop(); // Close the application
-            if (isWindows) {
-              exit(0);
+    ];
+    if (isIncomingOnly) {
+      children.addAll([
+        Divider(),
+        OnlineStatusWidget(
+          onSvcStatusChanged: () {
+            if (isInHomePage()) {
+              Future.delayed(Duration(milliseconds: 300), () {
+                _updateWindowSize();
+              });
             }
           },
-          child: Text(translate('Quit')),
-        ),
-      ).marginAll(14),
-    ];
-    
+        ).marginOnly(bottom: 6, right: 6)
+      ]);
+    }
     final textColor = Theme.of(context).textTheme.titleLarge?.color;
     return ChangeNotifierProvider.value(
       value: gFFI.serverModel,
       child: Container(
-        key: _childKey,
-        width: 280.0, // 固定宽度
+        width: isIncomingOnly ? 280.0 : 200.0,
         color: Theme.of(context).colorScheme.background,
         child: Stack(
           children: [
@@ -137,6 +140,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                 SingleChildScrollView(
                   controller: _leftPaneScrollController,
                   child: Column(
+                    key: _childKey,
                     children: children,
                   ),
                 ),
@@ -176,6 +180,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     );
   }
 
+  buildRightPane(BuildContext context) {
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: ConnectionPage(),
+    );
+  }
+
   buildIDBoard(BuildContext context) {
     final model = gFFI.serverModel;
     return Container(
@@ -211,6 +222,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                                   ?.color
                                   ?.withOpacity(0.5)),
                         ).marginOnly(top: 5),
+                        buildPopupMenu(context)
                       ],
                     ),
                   ),
@@ -243,6 +255,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     );
   }
 
+  Widget buildPopupMenu(BuildContext context) {
+    return Container();
+  }
+
   buildPasswordBoard(BuildContext context) {
     return ChangeNotifierProvider.value(
         value: gFFI.serverModel,
@@ -254,53 +270,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   buildPasswordBoard2(BuildContext context, ServerModel model) {
-    final textColor = Theme.of(context).textTheme.titleLarge?.color;
-    return Container(
-      margin: EdgeInsets.only(left: 20.0, right: 16, top: 13, bottom: 13),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        children: [
-          Container(
-            width: 2,
-            height: 52,
-            decoration: BoxDecoration(color: MyTheme.accent),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(left: 7),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AutoSizeText(
-                    translate("One-time Password"),
-                    style: TextStyle(
-                        fontSize: 14, color: textColor?.withOpacity(0.5)),
-                    maxLines: 1,
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: model.serverPasswd,
-                          readOnly: true,
-                          decoration: InputDecoration(
-                            border: InputBorder.none,
-                            contentPadding:
-                                EdgeInsets.only(top: 14, bottom: 10),
-                          ),
-                          style: TextStyle(fontSize: 15),
-                        ).workaroundFreezeLinuxMint(),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    return Container();
   }
 
   buildTip(BuildContext context) {
@@ -330,6 +300,12 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           if (!isOutgoingOnly)
             Text(
               translate("desk_tip"),
+              overflow: TextOverflow.clip,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          if (isOutgoingOnly)
+            Text(
+              translate("outgoing_only_desk_tip"),
               overflow: TextOverflow.clip,
               style: Theme.of(context).textTheme.bodySmall,
             ),
@@ -367,7 +343,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
 
     if (isWindows && !bind.isDisableInstallation()) {
       if (!bind.mainIsInstalled()) {
-        return buildInstallCard("", "install_tip", "Install",
+        return buildInstallCard(
+            "", bind.isOutgoingOnly() ? "" : "install_tip", "Install",
             () async {
           await rustDeskWinManager.closeAllSubWindows();
           bind.mainGotoInstall();
@@ -381,13 +358,14 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         });
       }
     } else if (isMacOS) {
-      if (!bind.mainIsCanScreenRecording(prompt: false)) {
+      final isOutgoingOnly = bind.isOutgoingOnly();
+      if (!(isOutgoingOnly || bind.mainIsCanScreenRecording(prompt: false))) {
         return buildInstallCard("Permissions", "config_screen", "Configure",
             () async {
           bind.mainIsCanScreenRecording(prompt: true);
           watchIsCanScreenRecording = true;
         }, help: 'Help', link: translate("doc_mac_permission"));
-      } else if (!bind.mainIsProcessTrusted(prompt: false)) {
+      } else if (!isOutgoingOnly && !bind.mainIsProcessTrusted(prompt: false)) {
         return buildInstallCard("Permissions", "config_acc", "Configure",
             () async {
           bind.mainIsProcessTrusted(prompt: true);
@@ -399,16 +377,30 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           bind.mainIsCanInputMonitoring(prompt: true);
           watchIsInputMonitoring = true;
         }, help: 'Help', link: translate("doc_mac_permission"));
-      } else if (!svcStopped.value &&
+      } else if (!isOutgoingOnly &&
+          !svcStopped.value &&
           bind.mainIsInstalled() &&
           !bind.mainIsInstalledDaemon(prompt: false)) {
         return buildInstallCard("", "install_daemon_tip", "Install", () async {
           bind.mainIsInstalledDaemon(prompt: true);
         });
       }
+      //// Disable microphone configuration for macOS. We will request the permission when needed.
+      // else if ((await osxCanRecordAudio() !=
+      //     PermissionAuthorizeType.authorized)) {
+      //   return buildInstallCard("Permissions", "config_microphone", "Configure",
+      //       () async {
+      //     osxRequestAudio();
+      //     watchIsCanRecordAudio = true;
+      //   });
+      // }
     } else if (isLinux) {
+      if (bind.isOutgoingOnly()) {
+        return Container();
+      }
       final LinuxCards = <Widget>[];
       if (bind.isSelinuxEnforcing()) {
+        // Check is SELinux enforcing, but show user a tip of is SELinux enabled for simple.
         final keyShowSelinuxHelpTip = "show-selinux-help-tip";
         if (bind.mainGetLocalOption(key: keyShowSelinuxHelpTip) != 'N') {
           LinuxCards.add(buildInstallCard(
@@ -444,6 +436,21 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         );
       }
     }
+    if (bind.isIncomingOnly()) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: OutlinedButton(
+          onPressed: () {
+            SystemNavigator.pop(); // Close the application
+            // https://github.com/flutter/flutter/issues/66631
+            if (isWindows) {
+              exit(0);
+            }
+          },
+          child: Text(translate('Quit')),
+        ),
+      ).marginAll(14);
+    }
     return Container();
   }
 
@@ -476,7 +483,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     return Stack(
       children: [
         Container(
-          margin: EdgeInsets.fromLTRB(0, marginTop, 0, marginTop),
+          margin: EdgeInsets.fromLTRB(
+              0, marginTop, 0, bind.isIncomingOnly() ? marginTop : 0),
           child: Container(
               decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -597,6 +605,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       if (watchIsInputMonitoring) {
         if (bind.mainIsCanInputMonitoring(prompt: false)) {
           watchIsInputMonitoring = false;
+          // Do not notify for now.
+          // Monitoring may not take effect until the process is restarted.
+          // rustDeskWinManager.call(
+          //     WindowType.RemoteDesktop, kWindowDisableGrabKeyboard, '');
           setState(() {});
         }
       }
@@ -719,10 +731,11 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     });
     _uniLinksSubscription = listenUniLinks();
 
-    // 添加窗口大小调整
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _updateWindowSize();
-    });
+    if (bind.isIncomingOnly()) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _updateWindowSize();
+      });
+    }
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -733,8 +746,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     }
     if (renderObject is RenderBox) {
       final size = renderObject.size;
-      if (size != Size.zero) {
-        windowManager.setSize(Size(size.width + 40, size.height + 40)); // 添加一些边距
+      if (size != imcomingOnlyHomeSize) {
+        imcomingOnlyHomeSize = size;
+        windowManager.setSize(getIncomingOnlyHomeSize());
       }
     }
   }
@@ -770,4 +784,143 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       ),
     );
   }
+}
+
+void setPasswordDialog({VoidCallback? notEmptyCallback}) async {
+  final pw = await bind.mainGetPermanentPassword();
+  final p0 = TextEditingController(text: pw);
+  final p1 = TextEditingController(text: pw);
+  var errMsg0 = "";
+  var errMsg1 = "";
+  final RxString rxPass = pw.trim().obs;
+  final rules = [
+    DigitValidationRule(),
+    UppercaseValidationRule(),
+    LowercaseValidationRule(),
+    // SpecialCharacterValidationRule(),
+    MinCharactersValidationRule(8),
+  ];
+  final maxLength = bind.mainMaxEncryptLen();
+
+  gFFI.dialogManager.show((setState, close, context) {
+    submit() {
+      setState(() {
+        errMsg0 = "";
+        errMsg1 = "";
+      });
+      final pass = p0.text.trim();
+      if (pass.isNotEmpty) {
+        final Iterable violations = rules.where((r) => !r.validate(pass));
+        if (violations.isNotEmpty) {
+          setState(() {
+            errMsg0 =
+                '${translate('Prompt')}: ${violations.map((r) => r.name).join(', ')}';
+          });
+          return;
+        }
+      }
+      if (p1.text.trim() != pass) {
+        setState(() {
+          errMsg1 =
+              '${translate('Prompt')}: ${translate("The confirmation is not identical.")}';
+        });
+        return;
+      }
+      bind.mainSetPermanentPassword(password: pass);
+      if (pass.isNotEmpty) {
+        notEmptyCallback?.call();
+      }
+      close();
+    }
+
+    return CustomAlertDialog(
+      title: Text(translate("Set Password")),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 500),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(
+              height: 8.0,
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    obscureText: true,
+                    decoration: InputDecoration(
+                        labelText: translate('Password'),
+                        errorText: errMsg0.isNotEmpty ? errMsg0 : null),
+                    controller: p0,
+                    autofocus: true,
+                    onChanged: (value) {
+                      rxPass.value = value.trim();
+                      setState(() {
+                        errMsg0 = '';
+                      });
+                    },
+                    maxLength: maxLength,
+                  ).workaroundFreezeLinuxMint(),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(child: PasswordStrengthIndicator(password: rxPass)),
+              ],
+            ).marginSymmetric(vertical: 8),
+            const SizedBox(
+              height: 8.0,
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    obscureText: true,
+                    decoration: InputDecoration(
+                        labelText: translate('Confirmation'),
+                        errorText: errMsg1.isNotEmpty ? errMsg1 : null),
+                    controller: p1,
+                    onChanged: (value) {
+                      setState(() {
+                        errMsg1 = '';
+                      });
+                    },
+                    maxLength: maxLength,
+                  ).workaroundFreezeLinuxMint(),
+                ),
+              ],
+            ),
+            const SizedBox(
+              height: 8.0,
+            ),
+            Obx(() => Wrap(
+                  runSpacing: 8,
+                  spacing: 4,
+                  children: rules.map((e) {
+                    var checked = e.validate(rxPass.value.trim());
+                    return Chip(
+                        label: Text(
+                          e.name,
+                          style: TextStyle(
+                              color: checked
+                                  ? const Color(0xFF0A9471)
+                                  : Color.fromARGB(255, 198, 86, 157)),
+                        ),
+                        backgroundColor: checked
+                            ? const Color(0xFFD0F7ED)
+                            : Color.fromARGB(255, 247, 205, 232));
+                  }).toList(),
+                ))
+          ],
+        ),
+      ),
+      actions: [
+        dialogButton("Cancel", onPressed: close, isOutline: true),
+        dialogButton("OK", onPressed: submit),
+      ],
+      onSubmit: submit,
+      onCancel: close,
+    );
+  });
 }
