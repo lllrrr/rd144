@@ -59,14 +59,11 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final isIncomingOnly = bind.isIncomingOnly();
     return _buildBlock(
         child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // 只保留左侧面板，移除右侧面板
         buildLeftPane(context),
-        if (!isIncomingOnly) const VerticalDivider(width: 1),
-        if (!isIncomingOnly) Expanded(child: buildRightPane(context)),
       ],
     ));
   }
@@ -131,7 +128,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     return ChangeNotifierProvider.value(
       value: gFFI.serverModel,
       child: Container(
-        width: isIncomingOnly ? 280.0 : 200.0,
+        width: 280.0, // 增加左侧面板宽度以填满窗口
         color: Theme.of(context).colorScheme.background,
         child: Stack(
           children: [
@@ -180,12 +177,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     );
   }
 
-  buildRightPane(BuildContext context) {
-    return Container(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      child: ConnectionPage(),
-    );
-  }
+  // 移除 buildRightPane 方法，因为我们不再需要右侧面板
 
   buildIDBoard(BuildContext context) {
     final model = gFFI.serverModel;
